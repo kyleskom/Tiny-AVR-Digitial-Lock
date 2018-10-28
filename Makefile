@@ -6,7 +6,7 @@ PROGFLAGS=-B100 -p t85 -c $(ISP) -e
 #ISP=jtag3isp
 ISP=usbtiny
 
-programs = Project2 Project2B
+programs = Project2
 
 all: ${programs}
 
