@@ -11,7 +11,7 @@ programs = Project2 Project2B
 all: ${programs}
 
 clean:
-	rm -f *.hex *~ *.o ${programs} *.S
+	rm -f *.hex *~ *.o ${programs} *.S *.out
 
 %.S: %.c
 	$(CC) $(CFLAGS) -o $@ -S $<
