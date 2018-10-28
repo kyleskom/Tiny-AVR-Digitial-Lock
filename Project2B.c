@@ -4,6 +4,7 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
+#include <avr/eeprom.h>
 
 #define LED_PIN0 (1 << PB0)
 #define LED_PIN1 (1 << PB1)
@@ -20,11 +21,21 @@ void clear();
 
 typedef enum { RELEASED=0, PRESSED } key_t;
 
-volatile int code = 0b000000;
+volatile uint8_t code = 0b000000; // The lock code. Set to volatile so compiler won't make changes
 
-int codeInput(bool lockFlag){
-  uint8_t pressCount = 0b000000;
-  uint8_t enteredCode = 0b000000;
+/* @return uint8_t
+   @parameters bool
+   Function to create a uint8_t that represents a 6 bit input pattern
+   Uses debouncing and delays to hanlde switch bouncing
+   Shifts code << 1, adds 0b0 if KEY0 is pushed, 0b1 if KEY1
+   Uses uint8_t to keep track of inputed code and button press count
+   Turns on BLUE LED when button is pressed to indicate a press
+   Checks to see if pressCount = 0b111111, indicating 6 inputs and that we have our 6 bit code, returns
+   Checks what state we are in and sets LED's accordingly
+*/
+uint8_t codeInput(bool lockFlag){
+  uint8_t pressCount = 0b000000; //How many times inputs were pressed
+  uint8_t enteredCode = 0b000000; // Our input code
   uint8_t b0_history = 0;
   uint8_t b1_history = 0;
   key_t keystate = RELEASED;
@@ -48,6 +59,12 @@ int codeInput(bool lockFlag){
       keystate = RELEASED;
     }
 
+    /* KEY0 PRESSED
+       Set BLUE LED to on
+       Shifts enteredCode << 1
+       Adds 0b0 to least significant bit
+       Increases pressCount via same method
+    */
     if (keystate == PRESSED && clicked){
       DDRB = LED_PIN1|LED_PIN2;
       PORTB = LED_PIN1;
@@ -76,6 +93,12 @@ int codeInput(bool lockFlag){
           keystate = RELEASED;
         }
 
+        /* KEY1 PRESSED
+           Set BLUE LED to on
+           Shifts enteredCode << 1
+           Adds 0b1 to least significant bit
+           Increases pressCount via same method
+        */
         if (keystate == PRESSED && clicked){
           DDRB = LED_PIN1|LED_PIN2;
           PORTB = LED_PIN1;
@@ -87,10 +110,16 @@ int codeInput(bool lockFlag){
         }
           clicked = false;
 
+    /* Check to see if we entered 6 bit code
+       If pressCount = 0b111111, we have entered our 6 bit input
+       Clear LED's and return our 6 bit code
+    */
     if (pressCount == 0b111111){
       clear();
       return enteredCode;
     }
+
+    // Checks what state we are in and sets LED's accordingly
     if(lockFlag){
       DDRB = LED_PIN1 | LED_PIN2;
       PORTB = LED_PIN2;
@@ -103,6 +132,10 @@ int codeInput(bool lockFlag){
   }
 }
 
+/* Representation of the unlocked state
+ Sets GREEN and YELLOW LED's to on
+ Calls the function codeInput that creates our 6 bit code
+ Calls lockedState which represents being locked. */
 void startState(){
   DDRB = LED_PIN1|LED_PIN0;
   PORTB = LED_PIN0;
@@ -111,10 +144,15 @@ void startState(){
   lockedState();
 }
 
+/* Representation of the locked state
+  Sets RED LED to on
+  Gets a user inputed 6 bit code via codeInput
+  Compares the lock code to the new user input
+  If equal changes state to unlocked state, clears LED's
+  Else, flashes YELLOW LED 5 times to signal invalid code
+*/
 void lockedState(){
-  volatile int codeAttempt = 0b000000;
-
-  key_t keystate = RELEASED;
+  uint8_t codeAttempt = 0b000000;
   DDRB = LED_PIN1 | LED_PIN2;
   PORTB = LED_PIN2;
   codeAttempt = codeInput(true);
@@ -135,11 +173,13 @@ void lockedState(){
   }
 }
 
+// Clear DDRB & PORTB to turn off all LED's
 void clear(){
   DDRB = 0b000000;
   PORTB = 0b000000;
 }
 
+//Entry point
 int main(void){
     startState();
 }
