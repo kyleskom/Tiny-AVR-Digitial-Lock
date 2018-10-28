@@ -24,63 +24,63 @@ volatile int code = 0b000000;
 
 int codeInput(bool lockFlag){
   uint8_t pressCount = 0b000000;
-  uint8_t enterCode = 0b000000;
-  uint8_t history = 0;
-  uint8_t history1 = 0;
+  uint8_t enteredCode = 0b000000;
+  uint8_t b0_history = 0;
+  uint8_t b1_history = 0;
   key_t keystate = RELEASED;
   while(1){
     bool clicked = false;
 
-  //Button 1
-  history = history << 1;
+  //Button 0
+  b0_history = b0_history << 1;
   if ((PINB & KEY0) == 0){ // low if button is pressed!
-    history = history | 0x1;
+    b0_history = b0_history | 0x1;
   }
 
   // Update the key state based on the latest 6 samples
-  if ((history & 0b111111) == 0b111111){
+  if ((b0_history & 0b111111) == 0b111111){
     keystate = PRESSED;
     clicked = true;
     _delay_ms(5);
   }
 
-    if ((history & 0b00111111) == 0){
+    if ((b0_history & 0b00111111) == 0){
       keystate = RELEASED;
     }
 
     if (keystate == PRESSED && clicked){
       DDRB = LED_PIN1|LED_PIN2;
       PORTB = LED_PIN1;
-      enterCode = enterCode << 1;
-      enterCode = enterCode | 0b1;
+      enteredCode = enteredCode << 1;
+      enteredCode = enteredCode | 0b0;
       pressCount = pressCount << 1;
       pressCount = pressCount | 0b1;
       _delay_ms(175);
     }
       clicked = false;
 
-      // Button 0
-      history1 = history1 << 1;
+      // Button 1
+      b1_history = b1_history << 1;
       if ((PINB & KEY1) == 0){ // low if button is pressed!
-        history1 = history1 | 0x1;
+        b1_history = b1_history | 0x1;
       }
 
       // Update the key state based on the latest 6 samples
-      if ((history1 & 0b111111) == 0b111111){
+      if ((b1_history & 0b111111) == 0b111111){
         keystate = PRESSED;
         clicked = true;
         _delay_ms(5);
       }
 
-        if ((history1 & 0b00111111) == 0){
+        if ((b1_history & 0b00111111) == 0){
           keystate = RELEASED;
         }
 
         if (keystate == PRESSED && clicked){
           DDRB = LED_PIN1|LED_PIN2;
           PORTB = LED_PIN1;
-          enterCode = enterCode << 1;
-          enterCode = enterCode | 0b0;
+          enteredCode = enteredCode << 1;
+          enteredCode = enteredCode | 0b1;
           pressCount = pressCount << 1;
           pressCount = pressCount | 0b1;
           _delay_ms(175);
@@ -89,7 +89,7 @@ int codeInput(bool lockFlag){
 
     if (pressCount == 0b111111){
       clear();
-      return enterCode;
+      return enteredCode;
     }
     if(lockFlag){
       DDRB = LED_PIN1 | LED_PIN2;
@@ -110,7 +110,7 @@ void startState(){
   code = codeInput(false);
   lockedState();
 }
-////////////////////////////////////////////////////////////////////////////////
+
 void lockedState(){
   volatile int codeAttempt = 0b000000;
 
