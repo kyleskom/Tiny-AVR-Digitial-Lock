@@ -5,6 +5,9 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/eeprom.h>
+#include <avr/power.h>
+#include <avr/sleep.h>
+#include <avr/interrupt.h>
 
 #define LED_PIN0 (1 << PB0)
 #define LED_PIN1 (1 << PB1)
@@ -21,7 +24,10 @@ void clear();
 
 typedef enum { RELEASED=0, PRESSED } key_t;
 
-volatile uint8_t code = 0b000000; // The lock code. Set to volatile so compiler won't make changes
+uint8_t savedCode = 0b111111; // EEPROM memory where we save the state
+uint8_t savedState = 0b111110; // EEPROM memory where we save the code
+
+uint8_t code = 0b000000; // The lock code. Set to volatile so compiler won't make changes
 
 /* @return uint8_t
    @parameters bool
@@ -125,22 +131,28 @@ uint8_t codeInput(bool lockFlag){
       PORTB = LED_PIN2;
     }else {
       DDRB = LED_PIN1|LED_PIN0;
-      PORTB = LED_PIN0;
       PORTB = LED_PIN1;
+      _delay_ms(5);
+      PORTB = LED_PIN0; // Using delays here to get full power to each LED to be brighter
+      _delay_ms(5);
     }
-    //_delay_ms(5);
   }
 }
 
 /* Representation of the unlocked state
  Sets GREEN and YELLOW LED's to on
  Calls the function codeInput that creates our 6 bit code
+ Saves state and code to EEPROM
  Calls lockedState which represents being locked. */
 void startState(){
   DDRB = LED_PIN1|LED_PIN0;
   PORTB = LED_PIN0;
   PORTB = LED_PIN1;
   code = codeInput(false);
+  savedCode = code;
+  eeprom_write_byte(&savedCode, code);
+  eeprom_write_byte(&savedState, 0b100000);
+  _delay_ms(75);
   lockedState();
 }
 
@@ -149,6 +161,7 @@ void startState(){
   Gets a user inputed 6 bit code via codeInput
   Compares the lock code to the new user input
   If equal changes state to unlocked state, clears LED's
+  Saves state and code to EEPROM
   Else, flashes YELLOW LED 5 times to signal invalid code
 */
 void lockedState(){
@@ -160,6 +173,10 @@ void lockedState(){
   if (codeAttempt == code){
     clear();
     code = 0b000000;
+    savedCode = code;
+    eeprom_update_byte(&savedCode, code);
+    eeprom_update_byte(&savedState, 0b000000);
+    _delay_ms(75);
     startState();
   } else {
     for (volatile int i = 0; i < 5; i++){
@@ -179,7 +196,41 @@ void clear(){
   PORTB = 0b000000;
 }
 
-//Entry point
+/*Entry point
+  If button is held down on startup will reset pin
+  Checks to see if last state was a locked state
+  If was locked, loads code from EEPROM memory and sets state to locked
+*/
 int main(void){
+    uint8_t history = 0;
+    key_t keystate = RELEASED;
+
+    //If button is held down on startup, it will reset code.
+    for(int i =0 ; i <1000;i++){
+      // Get a sample of the key pin
+      history = history << 1;
+      if ((PINB & KEY1) == 0) // low if button is pressed!
+        history = history | 0x1;
+
+      // Update the key state based on the latest 6 samples
+      if ((history & 0b111111) == 0b111111){
+        keystate = PRESSED;
+      }
+
+      // Turn on the LED based on the state
+      if (keystate == PRESSED){
+        _delay_ms(2000);
+        startState();
+      }
+    }
+
+  /*Checks to see if we were last in a lockedState
+    If we were we load that code into code
+    Return to a locked state with the perviously used code
+  */
+  if(eeprom_read_byte(&savedState) == 0b100000){
+    code = eeprom_read_byte(&savedCode);
+    lockedState();
+  } // Else we just enter the startState and ready to accept input
     startState();
 }
