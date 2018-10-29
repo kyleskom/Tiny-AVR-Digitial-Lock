@@ -6,7 +6,7 @@ PROGFLAGS=-B100 -p t85 -c $(ISP) -e
 #ISP=jtag3isp
 ISP=usbtiny
 
-programs = Project2
+programs = AVRDigitalLock
 
 all: ${programs}
 
